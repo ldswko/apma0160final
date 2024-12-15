@@ -1,88 +1,71 @@
 function dawson_ode
 
-t_full = linspace(0, 5, 201);
-t_reduced = linspace(0, 5, 11);
+t0 = 0; t_end = 5; 
+N1 = 200; 
+N2 = 10;   
+t_200 = linspace(t0, t_end, N1 + 1);
+t_10 = linspace(t0, t_end, N2 + 1);
 y0 = 0;
-f = @(t, y) 1 - 2 * t .* y;
-
-y_heun = heun_method(f, t_full, y0);
-y_rk4 = rk4_method(f, t_full, y0);
-y_trap = implicit_trapezoid(f, t_full, y0);
-
-y_heun_2 = heun_method(f, t_reduced, y0);
-y_rk4_2 = rk4_method(f, t_reduced, y0);
-y_trap_2 = implicit_trapezoid(f, t_reduced, y0);
-
-exact_full = dawson_integral(t_full);
-exact_reduced = dawson_integral(t_reduced);
-
-heun_err = max(abs(y_heun - exact_full));
-rk4_err = max(abs(y_rk4 - exact_full));
-trap_err = max(abs(y_trap - exact_full));
-
-heun_err_2 = max(abs(y_heun_2 - exact_reduced));
-rk4_err_2 = max(abs(y_rk4_2 - exact_reduced));
-trap_err_2 = max(abs(y_trap_2 - exact_reduced));
-
-fprintf('Full time steps over 200 intervals:\n');
-fprintf('Heun error: %.4f\n', heun_err);
-fprintf('RK4 error: %.4f\n', rk4_err);
-fprintf('Trapezoid error: %.4f\n\n', trap_err);
     
-fprintf('Reduced time steps over 10 intervals:\n');
-fprintf('Heun error: %.4f\n', heun_err_2);
-fprintf('RK4 error: %.4f\n', rk4_err_2);
-fprintf('Trapezoid error: %.4f\n', trap_err_2);
+y_heun = zeros(size(t_200));
+y_rk4 = zeros(size(t_200));
+y_trap = zeros(size(t_200));
+y_heun_2 = zeros(size(t_10));
+y_rk4_2 = zeros(size(t_10));
+y_trap_2 = zeros(size(t_10));
+    
+[y_heun, y_rk4, y_trap] = calculate_dawson(t_200, y0);
+[y_heun_2, y_rk4_2, y_trap_2] = calculate_dawson(t_10, y0);
+y_exact_200 = dawson_integral(t_200);
+y_exact_10 = dawson_integral(t_10);
+    
+heun_err = max(abs(y_heun - y_exact_200));
+rk4_err = max(abs(y_rk4 - y_exact_200));
+trap_err = max(abs(y_trap - y_exact_200));
+heun_err_2 = max(abs(y_heun_2 - y_exact_10));
+rk4_err_2 = max(abs(y_rk4_2 - y_exact_10));
+trap_err_2 = max(abs(y_trap_2 - y_exact_10));
+    
+fprintf('Maximum Errors with 200 Steps:\n');
+fprintf('Heun: %f, RK4: %f, Trapezoid: %f\n', heun_err, rk4_err, trap_err);
+fprintf('Maximum Errors with 10 Steps:\n');
+fprintf('Heun: %f, RK4: %f, Trapezoid: %f\n', heun_err_2, rk4_err_2, trap_err_2);
 
 end
 
-function y = heun_method(f, t, y0)
+function [y_heun, y_rk4, y_trap] = calculate_dawson(t, y0)
 
+N = length(t) - 1;
+y_heun = zeros(size(t));
+y_rk4 = zeros(size(t));
+y_trap = zeros(size(t));
+    
+y_heun(1) = y0;
+y_rk4(1) = y0;
+y_trap(1) = y0;
+    
 dt = t(2) - t(1);
-y = zeros(size(t));
-y(1) = y0;
+    
+for k = 1:N
 
-for k = 1:(length(t)-1)
-    y_predict = y(k) + dt * f(t(k), y(k));
-    y(k+1) = y(k) + (dt / 2) * (f(t(k), y(k)) + f(t(k+1), y_predict));
-end
-
-y = y(:)';
-
-end
-
-function y = rk4_method(f, t, y0)
-
-dt = t(2) - t(1);
-y = zeros(size(t));
-y(1) = y0;
-
-for k = 1:(length(t)-1)
-    k1 = f(t(k), y(k));
-    k2 = f(t(k) + dt/2, y(k) + dt/2 * k1);
-    k3 = f(t(k) + dt/2, y(k) + dt/2 * k2);
-    k4 = f(t(k) + dt, y(k) + dt * k3);
-    y(k+1) = y(k) + (dt / 6) * (k1 + 2*k2 + 2*k3 + k4);
-end
-
-y = y(:)';
+    tk = t(k);
+    yk_heun = y_heun(k);
+    yk_rk4 = y_rk4(k);
+    yk_trap = y_trap(k);
+        
+    f1 = 1 - 2 * tk * yk_heun;
+    y_pred = yk_heun + dt * f1; 
+    f2 = 1 - 2 * (tk + dt) * y_pred;
+    y_heun(k + 1) = yk_heun + (dt / 2) * (f1 + f2); % Corrector
+        
+    k1 = 1 - 2 * tk * yk_rk4;
+    k2 = 1 - 2 * (tk + dt / 2) * (yk_rk4 + (dt / 2) * k1);
+    k3 = 1 - 2 * (tk + dt / 2) * (yk_rk4 + (dt / 2) * k2);
+    k4 = 1 - 2 * (tk + dt) * (yk_rk4 + dt * k3);
+    y_rk4(k + 1) = yk_rk4 + (dt / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+        
+    y_trap(k + 1) = (yk_trap * (1 - dt * tk) + dt) / (1 + dt * (tk + dt));
 
 end
 
-function y = implicit_trapezoid(f, t, y0)
-
-dt = t(2) - t(1);
-y = zeros(size(t));
-y(1) = y0;
-
-for k = 1:(length(t)-1)
-    y_next = y(k);
-    for iter = 1:10
-        y_next = y(k) + (dt / 2) * (f(t(k), y(k)) + f(t(k+1), y_next));
-    end
-    y(k+1) = y_next;
-end
-
-y = y(:)';
- 
 end
